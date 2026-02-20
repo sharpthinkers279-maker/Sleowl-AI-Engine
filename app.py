@@ -82,17 +82,28 @@ with col1:
 
     if submitted:
         bmi = round(w / ((h/100)**2), 2)
-        # THE QUOTA PROTECTION BLOCK
         try:
+            # Initialize 2026 Client
             client = genai.Client(api_key=api_key)
-            prompt = (f"User: {name}. BMI: {bmi}. Exercise: {ex} hrs. State: {state}. Mental: {mental}/10. "
-                      f"Suggest a personalized VEGETARIAN diet and 1-week health plan.")
             
-            response = client.models.generate_content(model='gemini-2.0-flash', contents=prompt)
-            plan_text = response.text
+            # Requesting the high-efficiency 2026 model
+            response = client.models.generate_content(
+                model='gemini-2.0-flash', 
+                contents=f"User: {name}. BMI: {bmi}. Vegetarian plan."
+            )
             
-            st.success("Prescription Ready!")
-            st.markdown(plan_text)
+            st.success("Analysis Complete")
+            st.markdown(response.text)
+            
+            # (Your MySQL Cloud Sync Code stays here)
+
+        except Exception as e:
+            # Handling the 429 Quota Limit professionally
+            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                st.error("🦉 **Sleowl Engine is cooling down.**")
+                st.info("Because we are on the Free Tier, we can only do 2-3 diagnostics per minute. Please wait 30 seconds and try again.")
+            else:
+                st.error(f"Diagnostic Interrupted: {str(e)}")
 
             # PDF Download
             report_bytes = create_report(name, plan_text, bmi)
