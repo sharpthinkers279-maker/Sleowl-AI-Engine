@@ -1,11 +1,10 @@
 import streamlit as st
 import mysql.connector
-from google import genai
 import pandas as pd
 from fpdf import FPDF
 import datetime
 
-# 1. ENTERPRISE CONFIG & UI
+# 1. PLATFORM CONFIGURATION
 st.set_page_config(page_title="Sleowl AI Engine", page_icon="🦉", layout="wide")
 
 st.markdown("""
@@ -25,41 +24,50 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 2. PDF ENGINE
+# 2. SLEOWL DETERMINISTIC LOGIC ENGINE (Replaces Gemini)
+def generate_sleowl_plan(name, bmi, ex, state, mental):
+    plan = f"### 🦉 Sleowl Bio-Kinetic Profile: {name}\n\n"
+    
+    # Diet Logic (Strict Vegetarian)
+    plan += "**🥦 Nutritional Prescription (Vegetarian):**\n"
+    if bmi < 18.5:
+        plan += "- Status: Underweight. Focus on caloric surplus.\n- Intake: High-protein paneer, almonds, peanut butter, and complex carbs (oats/rice) to build mass.\n"
+    elif bmi > 25.0:
+        plan += "- Status: Elevated BMI. Focus on caloric deficit.\n- Intake: High-fiber salads, lentils (dal), green tea, and strict avoidance of processed sugars.\n"
+    else:
+        plan += "- Status: Optimal BMI. Focus on maintenance.\n- Intake: Balanced macros with tofu, seasonal vegetables, and whole wheat rotis.\n"
+        
+    # Recovery & Mental Logic
+    plan += "\n**🧠 Recovery & Cognitive Protocol:**\n"
+    if mental <= 5 or state in ["Fatigued", "Injured"]:
+        plan += f"- Note: Low energy/fatigue detected (Mental Score: {mental}/10).\n- Action: Prioritize 8+ hours of sleep, deep breathing exercises, and suspend heavy weightlifting. Focus on light yoga.\n"
+    else:
+        plan += f"- Note: High performance state detected (Mental Score: {mental}/10).\n- Action: Maintain {ex} hours of weekly exercise. Focus on progressive overload and aviation-level cognitive focus.\n"
+        
+    return plan
+
+# 3. PDF ENGINE
 def create_report(user_name, plan, bmi):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", "B", 18)
     pdf.cell(0, 15, "Sleowl Clinical Diagnostic Report", ln=True, align='C')
     pdf.set_font("Arial", size=12)
-    pdf.cell(0, 10, f"Patient Name: {user_name}", ln=True)
-    pdf.cell(0, 10, f"Calculated BMI: {bmi}", ln=True)
+    pdf.cell(0, 10, f"Patient Name: {user_name} | Calculated BMI: {bmi}", ln=True)
     pdf.ln(10)
-    pdf.multi_cell(0, 10, plan)
+    pdf.multi_cell(0, 10, plan.replace('*', '')) # Strip markdown for PDF
     return pdf.output(dest='S').encode('latin-1')
 
-# 3. LEGAL & ADMIN GATEWAY
-if 'tos_agreed' not in st.session_state:
-    st.session_state.tos_agreed = False
-
-if not st.session_state.tos_agreed:
-    st.title("⚖️ Sleowl User Agreement")
-    st.write("By using this AI engine, you agree that suggestions are for diagnostic simulation only.")
-    if st.button("I AGREE & PROCEED"):
-        st.session_state.tos_agreed = True
-        st.rerun()
-    st.stop()
-
+# 4. ADMIN VAULT
 with st.sidebar:
     st.header("🔐 Admin Vault")
-    api_key = st.sidebar.text_input("Gemini API Key", type="password")
-    db_pass = st.sidebar.text_input("Aiven MySQL Password", type="password")
+    db_pass = st.text_input("Aiven MySQL Password", type="password")
 
-if not api_key or not db_pass:
-    st.error("SYSTEM OFFLINE: Admin Authentication Required.")
+if not db_pass:
+    st.error("SYSTEM OFFLINE: Database Authentication Required.")
     st.stop()
 
-# 4. DIAGNOSTIC ENGINE
+# 5. DIAGNOSTIC PORTAL
 st.title("🦉 SLEOWL: PUBLIC HEALTH PORTAL")
 st.markdown("---")
 
@@ -75,41 +83,25 @@ with col1:
             ex = st.number_input("Exercise (Hrs/Week)", min_value=0)
         with c2:
             h = st.number_input("Height (cm)", min_value=1.0)
-            state = st.selectbox("Physical State", ["Peak", "Normal", "Tired", "Injured"])
+            state = st.selectbox("Physical State", ["Peak", "Normal", "Fatigued", "Injured"])
         mental = st.slider("Mental Energy", 1, 10, 5)
-        notes = st.text_area("Additional Context (Goals/Allergies)")
         submitted = st.form_submit_button("GENERATE SLEOWL HEALTH PLAN")
 
     if submitted:
         bmi = round(w / ((h/100)**2), 2)
+        
+        # Instant Logic Generation (No Quotas, No Limits)
+        plan_text = generate_sleowl_plan(name, bmi, ex, state, mental)
+        
+        st.success("Prescription Ready!")
+        st.markdown(plan_text)
+
+        # PDF Download
+        report_bytes = create_report(name, plan_text, bmi)
+        st.download_button(label="📥 DOWNLOAD REPORT (PDF)", data=report_bytes, file_name=f"Sleowl_{name}.pdf", mime="application/pdf")
+
+        # Database Sync
         try:
-            # Initialize 2026 Client
-            client = genai.Client(api_key=api_key)
-            
-            # Requesting the high-efficiency 2026 model
-            response = client.models.generate_content(
-                model='gemini-2.0-flash', 
-                contents=f"User: {name}. BMI: {bmi}. Vegetarian plan."
-            )
-            
-            st.success("Analysis Complete")
-            st.markdown(response.text)
-            
-            # (Your MySQL Cloud Sync Code stays here)
-
-        except Exception as e:
-            # Handling the 429 Quota Limit professionally
-            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
-                st.error("🦉 **Sleowl Engine is cooling down.**")
-                st.info("Because we are on the Free Tier, we can only do 2-3 diagnostics per minute. Please wait 30 seconds and try again.")
-            else:
-                st.error(f"Diagnostic Interrupted: {str(e)}")
-
-            # PDF Download
-            report_bytes = create_report(name, plan_text, bmi)
-            st.download_button(label="📥 DOWNLOAD REPORT (PDF)", data=report_bytes, file_name=f"Sleowl_{name}.pdf", mime="application/pdf")
-
-            # MySQL Sync
             conn = mysql.connector.connect(host='sleowl-ind-sleowl-db.k.aivencloud.com', user='avnadmin', password=db_pass, port='15618', database='defaultdb')
             cursor = conn.cursor()
             cursor.execute("CREATE TABLE IF NOT EXISTS public_diagnostics (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(100), bmi FLOAT, plan TEXT)")
@@ -118,10 +110,7 @@ with col1:
             conn.close()
             st.toast("Telemetry saved to Aiven Cloud")
         except Exception as e:
-            if "429" in str(e):
-                st.warning("🦉 Sleowl is at peak capacity. Please wait 60 seconds.")
-            else:
-                st.error(f"Engine Fault: {e}")
+            st.error(f"Database Fault: {e}")
 
 with col2:
     st.subheader("🌍 Global Telemetry")
@@ -130,9 +119,9 @@ with col2:
             conn = mysql.connector.connect(host='sleowl-ind-sleowl-db.k.aivencloud.com', user='avnadmin', password=db_pass, port='15618', database='defaultdb')
             df = pd.read_sql("SELECT bmi FROM public_diagnostics", conn)
             st.line_chart(df['bmi'])
-            st.write(f"Total Diagnostics: {len(df)}")
+            st.metric("Total Diagnostics Served", len(df))
             conn.close()
         except:
             st.info("Syncing with cloud...")
 
-st.markdown(f'<div class="footer"><p>Built by Devansh Nadpara | Powered by Sleowl AI Engine 🦉</p></div>', unsafe_allow_html=True)
+st.markdown(f'<div class="footer"><p>Built with ❤️ by Devansh Nadpara | Powered by Sleowl Deterministic Engine 🦉</p></div>', unsafe_allow_html=True)
