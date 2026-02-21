@@ -1,5 +1,4 @@
 streamlit
 mysql-connector-python
-google-genai
 pandas
 fpdf2
